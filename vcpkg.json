@@ -1,0 +1,13 @@
+{
+  "name": "horror",
+  "version": "0.1.0",
+  "dependencies": [
+    "glfw3",
+    "vulkan-memory-allocator",
+		"ktx",
+		"glslang",
+		"assimp",
+		"joltphysics"
+  ]
+}
+

@@ -82,26 +82,37 @@ void Game::guiWidget() {
       if (ImGui::Selectable("1920x1080")) {
         gameSettings.width = 1920;
         gameSettings.height = 1080;
+        glfwSetWindowSize(app->window, gameSettings.width, gameSettings.height);
       }
       if (ImGui::Selectable("1300x760")) {
         gameSettings.width = 1300;
         gameSettings.height = 760;
+        glfwSetWindowSize(app->window, gameSettings.width, gameSettings.height);
       }
       if (ImGui::Selectable("1200x760")) {
         gameSettings.width = 1200;
         gameSettings.height = 800;
+        glfwSetWindowSize(app->window, gameSettings.width, gameSettings.height);
       }
       ImGui::EndPopup();
     }
 
     ImGui::NewLine();
     int fullScreen = (int)gameSettings.isFullScreen;
-    if (ImGui::RadioButton("Fullscreen", &fullScreen, 1))
+    if (ImGui::RadioButton("Fullscreen", &fullScreen, 1)) {
+      GLFWmonitor *monitor = glfwGetPrimaryMonitor();
+      const GLFWvidmode *mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+      glfwSetWindowMonitor(app->window, monitor, 0, 0, gameSettings.width,
+                           gameSettings.height, mode->refreshRate);
       gameSettings.isFullScreen = (bool)fullScreen;
+    }
 
     ImGui::SameLine();
-    if (ImGui::RadioButton("Window", &fullScreen, 0))
+    if (ImGui::RadioButton("Window", &fullScreen, 0)) {
       gameSettings.isFullScreen = (bool)fullScreen;
+      glfwSetWindowMonitor(app->window, nullptr, 0, 0, gameSettings.width,
+                           gameSettings.height, 0);
+    }
 
     ImGui::NewLine();
     ImGui::Text("Graphics");
@@ -204,6 +215,7 @@ void Game::load() {
       .height = gameSettings.height,
       .appName = gameSettings.name.c_str(),
       .isFullscreen = gameSettings.isFullScreen,
+      .allowResize = true,
   };
   app = new MaiApp(info);
   ren = app->ren;

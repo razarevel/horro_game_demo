@@ -14,25 +14,26 @@ float lastY = 0.0f;
 
 MaiApp::MaiApp(MAI::WindowInfo &info) {
   camera = new Camera(glm::vec3(0.0f, 0.0f, 3.0f));
-  windowInfo = {
+  window = MAI::initWindow(info);
+
+  windowSize = {
       .width = info.width,
       .height = info.height,
-      .appName = info.appName,
   };
-  window = MAI::initWindow(windowInfo);
-  ren = MAI::initVulkanWithSwapChain(window, windowInfo.appName);
+
+  ren = MAI::initVulkanWithSwapChain(window, info.appName);
 
   depthTexture = ren->createImage({
       .type = MAI::TextureType_2D,
       .format = MAI::Format_Z_F32,
-      .dimensions = {(uint32_t)windowInfo.width, windowInfo.height},
+      .dimensions = {info.width, info.height},
       .usage = MAI::Attachment_Bit,
   });
 
   colorTexture = ren->createImage({
       .type = MAI::TextureType_2D,
       .format = MAI::Format_R_Uint32,
-      .dimensions = {windowInfo.width, windowInfo.height},
+      .dimensions = {info.width, info.height},
       .usage = MAI::Color_Attachment_Bit,
   });
 
@@ -128,6 +129,35 @@ void MaiApp::run(DrawFrameFunc drawFrame) {
     glfwGetFramebufferSize(window, &width, &height);
     if (!width || !height)
       continue;
+
+    if (windowSize.width != width || windowSize.height != height) {
+      windowSize = {(uint32_t)width, (uint32_t)height};
+      ren->getVulkanContext()->recreateSwapChain();
+      ren->resetDepth = true;
+      continue;
+    }
+
+    if (ren->resetDepth) {
+      delete depthTexture;
+      delete colorTexture;
+
+      glfwGetFramebufferSize(window, &width, &height);
+
+      depthTexture = ren->createImage({
+          .type = MAI::TextureType_2D,
+          .format = MAI::Format_Z_F32,
+          .dimensions = {(uint32_t)width, (uint32_t)height},
+          .usage = MAI::Attachment_Bit,
+      });
+
+      colorTexture = ren->createImage({
+          .type = MAI::TextureType_2D,
+          .format = MAI::Format_R_Uint32,
+          .dimensions = {(uint32_t)width, (uint32_t)height},
+          .usage = MAI::Color_Attachment_Bit,
+      });
+    }
+
     float ratio = width / (float)height;
     const double newTimeStamp = glfwGetTime();
     deltaSecond = static_cast<float>(newTimeStamp - timeStamp);

@@ -35,7 +35,7 @@ struct MaiApp {
   MaiApp(MAI::WindowInfo &info);
   ~MaiApp();
 
-  MAI::WindowInfo windowInfo;
+  VkExtent2D windowSize;
   MAI::Renderer *ren = nullptr;
   GLFWwindow *window = nullptr;
   MAI::Texture *depthTexture = nullptr;

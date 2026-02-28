@@ -362,6 +362,8 @@ struct Renderer {
                           VkDeviceSize size);
   struct VulkanContext *getVulkanContext() { return ctx; }
 
+  bool resetDepth = false;
+
 private:
   uint32_t lastTextureCount = 0;
   uint32_t lastCubemapCount = 0;
@@ -779,6 +781,8 @@ GLFWwindow *initWindow(const WindowInfo &info);
 Renderer *initVulkanWithSwapChain(GLFWwindow *window = nullptr,
                                   const char *appName = nullptr,
                                   const struct RendererDefault &defaults = {});
+static void framebufferResizeCallback(GLFWwindow *window, int width,
+                                      int height);
 
 uint32_t calcNumMipLevel(uint32_t width, uint32_t height);
 
@@ -798,6 +802,7 @@ uint32_t calcNumMipLevel(uint32_t width, uint32_t height);
 namespace MAI {
 
 std::mutex mtx;
+bool frameBufferResize = false;
 
 constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 constexpr uint32_t MAX_TEXTURES = 1024;
@@ -2051,6 +2056,7 @@ void CommandBuffer::update(struct Texture *texture,
 void Renderer::waitDeviceIdle() { vkDeviceWaitIdle(ctx->device); }
 
 void Renderer::submit() {
+  resetDepth = false;
   uint32_t frameIndex = ctx->frameIndex;
 
   VkSemaphore waitSemaphore[] = {ctx->imageAvailableSemaphore[frameIndex]};
@@ -2087,11 +2093,11 @@ void Renderer::submit() {
       .pSwapchains = swapChains,
       .pImageIndices = &ctx->imageIndex,
   };
-  bool framedResized = false;
   VkResult result = vkQueuePresentKHR(ctx->presentQueue, &presentInfo);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
-      framedResized) {
-    framedResized = false;
+      frameBufferResize) {
+    resetDepth = true;
+    frameBufferResize = false;
     ctx->recreateSwapChain();
   } else if (result != VK_SUCCESS)
     throw std::runtime_error("failed to present swap chain image");
@@ -2205,8 +2211,16 @@ GLFWwindow *initWindow(const WindowInfo &info) {
                          glfwSetWindowShouldClose(window, GLFW_TRUE);
                      });
 
+  glfwSetFramebufferSizeCallback(window,
+                                 [](GLFWwindow *window, int width, int height) {
+                                   frameBufferResize = true;
+                                 });
+
   return window;
 }
+
+static void framebufferResizeCallback(GLFWwindow *window, int width,
+                                      int height) {}
 
 Renderer *initVulkanWithSwapChain(GLFWwindow *window, const char *appName,
                                   const struct RendererDefault &defaults) {
@@ -2563,6 +2577,13 @@ void VulkanContext::cleanupSwapChain() {
 }
 
 void VulkanContext::recreateSwapChain() {
+  int width = 0, height = 0;
+  glfwGetFramebufferSize(window, &width, &height);
+  while (width == 0 || height == 0) {
+    glfwGetFramebufferSize(window, &width, &height);
+    glfwWaitEvents();
+  }
+
   vkDeviceWaitIdle(device);
   cleanupSwapChain();
 

@@ -6,8 +6,8 @@ Objects::Objects(MAI::Renderer *ren, VkFormat format, Textures *texs)
     : ren(ren), textures(texs) {
   cube = Shapes::getCube(ren);
 
-  MAI::Shader *vert = ren->createShader(SHADERS_PATH "object.vert");
-  MAI::Shader *frag = ren->createShader(SHADERS_PATH "object.frag");
+  MAI::Shader *vert = ren->createShader(SHADERS_PATH "spvs/object.vert");
+  MAI::Shader *frag = ren->createShader(SHADERS_PATH "spvs/object.frag");
   pipeline = ren->createPipeline({
       .vert = vert,
       .frag = frag,
@@ -83,8 +83,11 @@ void Objects::settingBuffers() {
         .armTex = 0,
     };
     Texture *tex = textures->getTextures(obj.tex_id);
-    if (tex != nullptr)
+    if (tex != nullptr) {
       objPer.albedoTex = tex->albedo->getIndex();
+      objPer.normTex = tex->normal->getIndex();
+      objPer.armTex = tex->arm->getIndex();
+    }
 
     objs.emplace_back(objPer);
   }

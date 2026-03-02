@@ -13,7 +13,7 @@ struct ObjectPerFrame{
 		float tiling;
 		float ao;
 		float metallic;
-		float roughenss;
+		float roughness;
 		uint albedoTex;
 		uint normTex;
 		uint armTex;

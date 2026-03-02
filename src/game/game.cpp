@@ -2,6 +2,7 @@
 #include "engine/json.hpp"
 #include <fstream>
 #include <iostream>
+#include <thread>
 
 using json = nlohmann::json;
 
@@ -50,9 +51,15 @@ void Game::run() {
     glm::mat4 p = glm::perspective(45.0f, ratio, 0.1f, 1000.0f);
     p[1][1] *= -1;
     glm::mat4 view = app->camera->GetViewMatrix();
+    uint64_t buffAddress = ren->gpuAddress(buffPerFrame);
+
     buff->cmdBindDepthState({.depthWriteEnable = true, .compareOp = MAI::Less});
-    objects->draw(buff, ren->gpuAddress(buffPerFrame), p * view);
+
+    objects->draw(buff, buffAddress, p * view);
+    staticModels->draw(buff, p * view, buffAddress, app->camera->Position);
+
     buff->cmdBindDepthState({});
+
     guiWidget();
   });
 }
@@ -147,10 +154,22 @@ void Game::guiWidget() {
     ImGui::TreePop();
   }
 
+  glm::vec3 &camPos = app->camera->Position;
+
+  uint32_t id;
+  bool addAsset = false;
+  assets->assetsGui(id, addAsset);
+  if (addAsset) {
+    staticModels->addmodel(StaticModelInfo{
+        .model = assets->getModelInfo(id),
+        .pos = glm::vec3(camPos.x, camPos.y, camPos.z - 3.0),
+        .scale = 1.0f,
+    });
+  }
+
   ImGui::NewLine();
   ImGui::Text("Add Objects");
   if (ImGui::Button("Cube")) {
-    glm::vec3 &camPos = app->camera->Position;
     objects->addObject({
         .type = SHAPE,
         .object_id = 0,
@@ -162,10 +181,20 @@ void Game::guiWidget() {
     });
   }
 
+  staticModels->allModelGui();
   objects->allObjectGui();
   ImGui::End();
 
+  if (const ImGuiViewport *v = ImGui::GetMainViewport()) {
+    ImGui::SetNextWindowPos(
+        {v->WorkPos.x + v->WorkSize.x - 15.0f, v->WorkPos.y + 100.0f},
+        ImGuiCond_Always, {1.0f, 0.0f});
+
+    ImGui::SetNextWindowSize({v->WorkSize.x * 0.3f, 0}, ImGuiCond_Always);
+  }
+
   objects->objectGui();
+  staticModels->modelGui();
 }
 
 std::vector<ObjectsInfo> infos;
@@ -219,10 +248,17 @@ void Game::load() {
   };
   app = new MaiApp(info);
   ren = app->ren;
-  textures = new Textures(ren);
 
-  objects = new Objects(ren, app->depthTexture->getDeptFormat(), textures);
+  std::thread j([&] { textures = new Textures(ren); });
+  std::thread j2([&] { assets = new Assets(ren); });
+  j.join();
+  j2.join();
+
+  VkFormat format = app->depthTexture->getDeptFormat();
+  objects = new Objects(ren, format, textures);
   objects->addObjects(infos);
+
+  staticModels = new StaticModels(ren, format, assets);
 }
 
 void Game::save() {
@@ -280,6 +316,8 @@ void Game::save() {
 }
 
 Game::~Game() {
+  delete staticModels;
+  delete assets;
   delete buffPerFrame;
   delete objects;
   delete textures;

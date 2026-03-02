@@ -12,6 +12,7 @@ find_package(glslang CONFIG REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(Jolt CONFIG REQUIRED)
 find_package(Ktx CONFIG REQUIRED)
+find_package(assimp CONFIG REQUIRED)
 add_subdirectory(thirdParty/imgui)
 
 file(GLOB_RECURSE MY_SOURCES CONFIGURE_DEPENDS
@@ -42,5 +43,6 @@ target_link_libraries(horror_demo
 		KTX::ktx
 		KTX::astcenc-avx2-static
 		Jolt::Jolt
+		assimp::assimp
 		imgui
 )

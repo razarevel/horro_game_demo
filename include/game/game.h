@@ -1,6 +1,8 @@
 #pragma once
+#include "engine/assets.h"
 #include "engine/maiApp.h"
 #include "engine/scene/objects.h"
+#include "engine/scene/static_models.h"
 #include "engine/textures.h"
 
 struct Game {
@@ -16,7 +18,9 @@ private:
 
   // resources
   Textures *textures;
+  Assets *assets;
   Objects *objects = nullptr;
+  StaticModels *staticModels = nullptr;
   MAI::Buffer *buffPerFrame;
 
   void initGame();

@@ -115,14 +115,6 @@ void Objects::objectGui() {
     return;
   }
 
-  if (const ImGuiViewport *v = ImGui::GetMainViewport()) {
-    ImGui::SetNextWindowPos(
-        {v->WorkPos.x + v->WorkSize.x - 15.0f, v->WorkPos.y + 100.0f},
-        ImGuiCond_Always, {1.0f, 0.0f});
-
-    ImGui::SetNextWindowSize({v->WorkSize.x * 0.3f, 0}, ImGuiCond_Always);
-  }
-
   auto inputFloat3WithCommit = [&](const char *label, glm::vec3 &value) {
     ImGui::InputFloat3(label, glm::value_ptr(value));
     return ImGui::IsItemDeactivatedAfterEdit();
@@ -140,6 +132,12 @@ void Objects::objectGui() {
 
   ObjectsInfo &info = objects[focuseId];
   ImGui::Begin("Entity Properties");
+
+  if (ImGui::Button("Delete")) {
+    objects.erase(objects.begin() + focuseId);
+    focuseId--;
+    updateBuff = true;
+  }
 
   float val = info.tiling;
   if (inputFloatWithCommit("Tiling", val))

@@ -6,7 +6,6 @@
     "vulkan-memory-allocator",
 		"ktx",
 		"glslang",
-		"assimp",
 		"joltphysics"
   ]
 }

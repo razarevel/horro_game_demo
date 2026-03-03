@@ -39,7 +39,8 @@ struct ObjectsInfo {
 };
 
 struct Objects {
-  Objects(MAI::Renderer *ren, VkFormat format, Textures *texs);
+  Objects(MAI::Renderer *ren, VkFormat format, Textures *texs,
+          MAI::MSAASample count = MAI::Count_1_Bit);
   ~Objects();
 
   void draw(MAI::CommandBuffer *buff, uint64_t buffPerFrame, glm::mat4 pv);

@@ -11,7 +11,8 @@ struct StaticModelInfo {
 };
 
 struct StaticModels {
-  StaticModels(MAI::Renderer *ren, VkFormat format, Assets *assets);
+  StaticModels(MAI::Renderer *ren, VkFormat format, Assets *assets,
+               MAI::MSAASample count = MAI::Count_1_Bit);
   ~StaticModels();
 
   void addmodel(StaticModelInfo info);

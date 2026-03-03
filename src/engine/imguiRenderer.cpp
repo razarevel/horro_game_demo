@@ -26,6 +26,7 @@ void ImGuiRenderer::createPipeline() {
               .srcColorBlend = MAI::Src_Alpha,
               .dstColorBlend = MAI::Minus_Src_Alpha,
           },
+      .sampleCount = sampleCount,
       .cullMode = MAI::CullMode::None,
   };
   if ((depthFormat & VK_FORMAT_UNDEFINED) == 0) {
@@ -209,9 +210,10 @@ void ImGuiRenderer::endFrame(MAI::CommandBuffer *buff) {
 }
 
 ImGuiRenderer::ImGuiRenderer(MAI::Renderer *ren, GLFWwindow *win,
-                             VkFormat format, float fontSize)
-    : ren(ren), window(win), fontSize(fontSize), pimpl_(new ImGuiRendererImpl),
-      depthFormat(format) {
+                             VkFormat format, MAI::MSAASample count,
+                             float fontSize)
+    : ren(ren), window(win), fontSize(fontSize), sampleCount(count),
+      pimpl_(new ImGuiRendererImpl), depthFormat(format) {
   ImGui::CreateContext();
   ImGuiIO &io = ImGui::GetIO();
   io.BackendRendererName = "imgui-mai";

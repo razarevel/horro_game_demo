@@ -1,5 +1,6 @@
 #include "engine/maiApp.h"
 #include "imgui.h"
+#include <iostream>
 
 MouseState mouseState;
 
@@ -12,7 +13,8 @@ bool firstMouse = true;
 float lastX = 0.0f;
 float lastY = 0.0f;
 
-MaiApp::MaiApp(MAI::WindowInfo &info) {
+MaiApp::MaiApp(MAI::WindowInfo &info, MAI::MSAASample count)
+    : sampleCount(count) {
   camera = new Camera(glm::vec3(0.0f, 0.0f, 3.0f));
   window = MAI::initWindow(info);
 
@@ -23,25 +25,14 @@ MaiApp::MaiApp(MAI::WindowInfo &info) {
 
   ren = MAI::initVulkanWithSwapChain(window, info.appName);
 
-  depthTexture = ren->createImage({
-      .type = MAI::TextureType_2D,
-      .format = MAI::Format_Z_F32,
-      .dimensions = {info.width, info.height},
-      .usage = MAI::Attachment_Bit,
-  });
-
-  colorTexture = ren->createImage({
-      .type = MAI::TextureType_2D,
-      .format = MAI::Format_R_Uint32,
-      .dimensions = {info.width, info.height},
-      .usage = MAI::Color_Attachment_Bit,
-  });
+  prepareTextures();
 
   setMouseConfig();
   glfwSetKeyCallback(window, setKeyboardConfig);
   glfwSetWindowUserPointer(window, this);
 
-  imgui = new ImGuiRenderer(ren, window, depthTexture->getDeptFormat());
+  imgui = new ImGuiRenderer(ren, window, depthTexture->getDeptFormat(),
+                            sampleCount);
 }
 
 void MaiApp::setMouseConfig() {
@@ -119,6 +110,30 @@ void MaiApp::updateMouseMovement() {
     firstMouse = true;
 }
 
+void MaiApp::prepareTextures() {
+  if (depthTexture)
+    delete depthTexture;
+  if (colorTexture)
+    delete colorTexture;
+
+  depthTexture = ren->createImage({
+      .type = MAI::TextureType_2D,
+      .format = MAI::Format_Z_F32,
+      .dimensions = {windowSize.width, windowSize.height},
+      .usage = MAI::Attachment_Bit,
+      .sampleCount = sampleCount,
+  });
+
+  if (sampleCount != MAI::Count_1_Bit)
+    colorTexture = ren->createImage({
+        .type = MAI::TextureType_2D,
+        .format = MAI::Format_BGRA_S8,
+        .dimensions = {windowSize.width, windowSize.height},
+        .usage = MAI::Color_Attachment_Bit,
+        .sampleCount = sampleCount,
+    });
+}
+
 void MaiApp::run(DrawFrameFunc drawFrame) {
   double timeStamp = glfwGetTime();
   FPS fps;
@@ -138,24 +153,14 @@ void MaiApp::run(DrawFrameFunc drawFrame) {
     }
 
     if (ren->resetDepth) {
-      delete depthTexture;
-      delete colorTexture;
 
       glfwGetFramebufferSize(window, &width, &height);
 
-      depthTexture = ren->createImage({
-          .type = MAI::TextureType_2D,
-          .format = MAI::Format_Z_F32,
-          .dimensions = {(uint32_t)width, (uint32_t)height},
-          .usage = MAI::Attachment_Bit,
-      });
-
-      colorTexture = ren->createImage({
-          .type = MAI::TextureType_2D,
-          .format = MAI::Format_R_Uint32,
-          .dimensions = {(uint32_t)width, (uint32_t)height},
-          .usage = MAI::Color_Attachment_Bit,
-      });
+      windowSize = {
+          .width = (uint32_t)width,
+          .height = (uint32_t)height,
+      };
+      prepareTextures();
     }
 
     float ratio = width / (float)height;
@@ -172,16 +177,12 @@ void MaiApp::run(DrawFrameFunc drawFrame) {
 
     MAI::CommandBuffer *buff = ren->acquireCommandBuffer();
 
-    // off screen
-    buff->cmdBeginRendering({
-        .colorTexture = colorTexture,
-    });
-    offscreenDraw(buff, width, height, ratio, deltaSecond);
-    buff->cmdEndRendering(colorTexture);
-
     beforeDraw(buff, width, height, ratio, deltaSecond);
     // draw
-    buff->cmdBeginRendering({.texture = depthTexture});
+    buff->cmdBeginRendering({
+        .texture = depthTexture,
+        .colorTexture = colorTexture,
+    });
     imgui->beginFrame({(uint32_t)width, (uint32_t)height});
     drawFrame(buff, width, height, ratio, deltaSecond);
     // fps

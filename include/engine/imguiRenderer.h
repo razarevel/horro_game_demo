@@ -9,7 +9,9 @@
 
 struct ImGuiRenderer {
   ImGuiRenderer(MAI::Renderer *ren, GLFWwindow *win,
-                VkFormat format = VK_FORMAT_UNDEFINED, float fontSize = 24.0f);
+                VkFormat format = VK_FORMAT_UNDEFINED,
+                MAI::MSAASample count = MAI::Count_1_Bit,
+                float fontSize = 24.0f);
   ~ImGuiRenderer();
 
   void beginFrame(const MAI::Dimissions &dim);
@@ -21,6 +23,7 @@ private:
   MAI::Renderer *ren;
   GLFWwindow *window = nullptr;
   MAI::Pipeline *pipeline_ = nullptr;
+  MAI::MSAASample sampleCount;
   struct ImGuiRendererImpl *pimpl_ = nullptr;
   VkFormat depthFormat;
   float displayScale = 1.0f;

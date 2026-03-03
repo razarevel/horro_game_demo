@@ -32,7 +32,7 @@ public:
 };
 
 struct MaiApp {
-  MaiApp(MAI::WindowInfo &info);
+  MaiApp(MAI::WindowInfo &info, MAI::MSAASample count = MAI::Count_1_Bit);
   ~MaiApp();
 
   VkExtent2D windowSize;
@@ -40,6 +40,7 @@ struct MaiApp {
   GLFWwindow *window = nullptr;
   MAI::Texture *depthTexture = nullptr;
   MAI::Texture *colorTexture = nullptr;
+  MAI::MSAASample sampleCount;
   Camera *camera = nullptr;
   ImGuiRenderer *imgui;
   MouseState mouse_state;
@@ -47,8 +48,9 @@ struct MaiApp {
   DrawFrameFunc beforeDraw = [](auto...) {};
   DrawFrameFunc offscreenDraw = [](auto...) {};
   void run(DrawFrameFunc drawFrame);
-
   static std::array<bool, 2> getMods();
+
+  void prepareTextures();
 
 private:
   void setMouseConfig();

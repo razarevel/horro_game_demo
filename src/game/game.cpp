@@ -123,31 +123,29 @@ void Game::guiWidget() {
 
     ImGui::NewLine();
     ImGui::Text("Graphics");
-    int selected = gameSettings.graphics_mode;
-    if (ImGui::RadioButton("LOW", &selected, 0))
-      gameSettings.graphics_mode = selected;
-    ImGui::SameLine();
-    if (ImGui::RadioButton("Medium", &selected, 1))
-      gameSettings.graphics_mode = selected;
-    ImGui::SameLine();
-    if (ImGui::RadioButton("High", &selected, 2))
-      gameSettings.graphics_mode = selected;
 
     ImGui::NewLine();
-    if (ImGui::Button("MSAA"))
+    if (ImGui::Button("Anti Aliasing"))
       ImGui::OpenPopup("res_msaa");
     ImGui::SameLine();
 
-    std::string name = "MSAA x" + std::to_string(gameSettings.msaa);
+    std::string name;
+    if (gameSettings.msaa == 0)
+      name = "off";
+    else if (gameSettings.msaa == 1)
+      name = "MSAA";
+    else if (gameSettings.msaa == 2)
+      name = "TAA";
+
     ImGui::Text(name.c_str(), nullptr);
 
     if (ImGui::BeginPopup("res_msaa")) {
-      for (uint32_t i = 1; i < 6; i++) {
-        std::string mssa = "MSAA x" + std::to_string(i);
-        if (ImGui::Selectable(mssa.c_str())) {
-          gameSettings.msaa = i;
-        }
-      }
+      if (ImGui::Selectable("off"))
+        gameSettings.msaa = 0;
+      if (ImGui::Selectable("MSAA"))
+        gameSettings.msaa = 1;
+      if (ImGui::Selectable("TAA"))
+        gameSettings.msaa = 2;
       ImGui::EndPopup();
     }
 
@@ -246,7 +244,10 @@ void Game::load() {
       .isFullscreen = gameSettings.isFullScreen,
       .allowResize = true,
   };
-  app = new MaiApp(info);
+
+  MAI::MSAASample sampleLevel =
+      gameSettings.msaa > 0 ? MAI::Count_4_Bit : MAI::Count_1_Bit;
+  app = new MaiApp(info, sampleLevel);
   ren = app->ren;
 
   std::thread j([&] { textures = new Textures(ren); });
@@ -255,10 +256,10 @@ void Game::load() {
   j2.join();
 
   VkFormat format = app->depthTexture->getDeptFormat();
-  objects = new Objects(ren, format, textures);
+  objects = new Objects(ren, format, textures, sampleLevel);
   objects->addObjects(infos);
 
-  staticModels = new StaticModels(ren, format, assets);
+  staticModels = new StaticModels(ren, format, assets, sampleLevel);
 }
 
 void Game::save() {

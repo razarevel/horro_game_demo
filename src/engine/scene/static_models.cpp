@@ -2,7 +2,8 @@
 #include <imgui.h>
 #include <iostream>
 
-StaticModels::StaticModels(MAI::Renderer *ren, VkFormat format, Assets *assets)
+StaticModels::StaticModels(MAI::Renderer *ren, VkFormat format, Assets *assets,
+                           MAI::MSAASample count)
     : ren(ren), assets(assets) {
   MAI::Shader *vert = ren->createShader(SHADERS_PATH "model.vert");
   MAI::Shader *frag = ren->createShader(SHADERS_PATH "model.frag");
@@ -10,6 +11,7 @@ StaticModels::StaticModels(MAI::Renderer *ren, VkFormat format, Assets *assets)
       .vert = vert,
       .frag = frag,
       .depthFormat = format,
+      .sampleCount = count,
       .cullMode = MAI::CullMode::Back,
   });
   delete vert;

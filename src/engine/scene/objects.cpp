@@ -2,7 +2,8 @@
 #include "imgui.h"
 #include <iostream>
 
-Objects::Objects(MAI::Renderer *ren, VkFormat format, Textures *texs)
+Objects::Objects(MAI::Renderer *ren, VkFormat format, Textures *texs,
+                 MAI::MSAASample count)
     : ren(ren), textures(texs) {
   cube = Shapes::getCube(ren);
 
@@ -12,6 +13,7 @@ Objects::Objects(MAI::Renderer *ren, VkFormat format, Textures *texs)
       .vert = vert,
       .frag = frag,
       .depthFormat = format,
+      .sampleCount = count,
       .cullMode = MAI::CullMode::Back,
   });
   delete vert;

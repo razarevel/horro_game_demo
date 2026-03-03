@@ -120,6 +120,7 @@ enum TextureFormat : uint8_t {
   Format_RGBA_F16 = 0x04,
   Format_RGBA_F32 = 0x08,
   Format_R_Uint32 = 0x010,
+  Format_BGRA_S8 = 0x020,
 };
 
 enum TextureUsage : uint8_t {
@@ -488,6 +489,7 @@ struct PipelineInfo {
   MaiColorInfo color;
   VkFormat depthFormat;
   VkFormat colorFormat = VK_FORMAT_UNDEFINED;
+  MSAASample sampleCount = MAI::Count_1_Bit;
   VkDescriptorSetLayout setLayout = VK_NULL_HANDLE;
   CullMode cullMode = CullMode::None;
   PrimitiveTopology topology = PrimitiveTopology::Triangle_List;
@@ -539,6 +541,7 @@ struct TextureInfo {
   Dimissions dimensions;
   const void *data;
   TextureUsage usage;
+  MSAASample sampleCount = MAI::Count_1_Bit;
   bool updateDescriptor = true;
 };
 
@@ -589,6 +592,7 @@ struct ImageDesc {
   const void *data = nullptr;
   uint32_t mipLevel = 1;
   uint32_t arrayLayers = 1;
+  VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT;
   VkFormat format;
   VkImageTiling tiling;
   VkImageUsageFlags usage;
@@ -886,6 +890,7 @@ VkDescriptorPoolCreateFlags getDescriptorPoolCreateFlags(MAIFlags flags);
 VkDescriptorBindingFlags getDescriptorBindingFlags(MAIFlags binding);
 VkDescriptorSetLayoutCreateFlags
 getDescriptorSetLayoutCreateFlags(MAIFlags layoutFlags);
+VkSampleCountFlagBits getSampleCount(MSAASample flag);
 
 #ifdef MAI_INCLUDE_GLSLANG
 void compileShaderGlslang(ShaderStage stage, const char *code,
@@ -1101,7 +1106,7 @@ struct Pipeline *Renderer::createPipeline(const struct PipelineInfo &info_) {
 
   VkPipelineMultisampleStateCreateInfo multiSampling = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-      .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+      .rasterizationSamples = getSampleCount(info_.sampleCount),
       .sampleShadingEnable = VK_FALSE,
   };
 
@@ -1329,6 +1334,7 @@ struct Texture *Renderer::createImage(const struct TextureInfo &info) {
               .height = info.dimensions.height,
               .depth = info.dimensions.depth,
           },
+      .sampleCount = getSampleCount(info.sampleCount),
       .format = format_,
       .tiling = VK_IMAGE_TILING_OPTIMAL,
   };
@@ -1336,11 +1342,13 @@ struct Texture *Renderer::createImage(const struct TextureInfo &info) {
   if (info.usage == Sampled_Bit)
     imageInfo.usage =
         getImageUsage(info.usage) | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
   else if (info.usage == Attachment_Bit)
     imageInfo.usage = getImageUsage(info.usage);
+
   else if (info.usage == Color_Attachment_Bit)
     imageInfo.usage =
-        getImageUsage(info.usage) | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        getImageUsage(info.usage) | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
 
   if (info.type == MAI::TextureType_Cube) {
     imageSize *= sizeof(float) * 6;
@@ -1715,6 +1723,10 @@ void CommandBuffer::cmdBeginRendering(const struct BeginInfo &info) {
 
   if (info.colorTexture != nullptr) {
     attachmentInfo.imageView = info.colorTexture->getImageView();
+    attachmentInfo.resolveImageView = ctx->swapChainImageViews[ctx->imageIndex];
+    attachmentInfo.resolveImageLayout =
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    attachmentInfo.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
     attachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
   }
 
@@ -3108,7 +3120,7 @@ void VulkanContext::createImage(const struct ImageDesc &info, VkImage &image,
       .extent = info.extent,
       .mipLevels = info.mipLevel,
       .arrayLayers = info.arrayLayers,
-      .samples = VK_SAMPLE_COUNT_1_BIT,
+      .samples = info.sampleCount,
       .tiling = info.tiling,
       .usage = info.usage,
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
@@ -3206,7 +3218,7 @@ void VulkanContext::createImage(const struct ImageDesc &info, VkImage &image,
       .extent = info.extent,
       .mipLevels = info.mipLevel,
       .arrayLayers = info.arrayLayers,
-      .samples = VK_SAMPLE_COUNT_1_BIT,
+      .samples = info.sampleCount,
       .tiling = info.tiling,
       .usage = info.usage,
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
@@ -3707,6 +3719,8 @@ VkFormat getFormat(TextureFormat format) {
     return VK_FORMAT_R32G32B32A32_SFLOAT;
   case MAI::Format_R_Uint32:
     return VK_FORMAT_R32_UINT;
+  case MAI::Format_BGRA_S8:
+    return VK_FORMAT_B8G8R8A8_SRGB;
   }
   assert(false);
 }
@@ -3864,6 +3878,22 @@ getDescriptorSetLayoutCreateFlags(MAIFlags layoutFlags) {
   if (layoutFlags & Host_Only_Pool_Bit)
     flags |= VK_DESCRIPTOR_SET_LAYOUT_CREATE_HOST_ONLY_POOL_BIT_EXT;
   return flags;
+}
+
+VkSampleCountFlagBits getSampleCount(MSAASample flag) {
+  switch (flag) {
+  case Count_1_Bit:
+    return VK_SAMPLE_COUNT_1_BIT;
+  case Count_2_Bit:
+    return VK_SAMPLE_COUNT_2_BIT;
+  case Count_4_Bit:
+    return VK_SAMPLE_COUNT_4_BIT;
+  case Count_16_Bit:
+    return VK_SAMPLE_COUNT_16_BIT;
+  case Count_32_Bit:
+    return VK_SAMPLE_COUNT_32_BIT;
+  }
+  assert(false);
 }
 
 #ifdef MAI_INCLUDE_GLSLANG

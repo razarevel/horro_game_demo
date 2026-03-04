@@ -1,30 +1,24 @@
 #pragma once
-#include "engine/assets.h"
-#include "engine/maiApp.h"
-#include "engine/scene/objects.h"
-#include "engine/scene/static_models.h"
-#include "engine/textures.h"
+#include "engine/inputs.h"
+#include "engine/mai_config.h"
+#include "engine/mai_vk.h"
+#include "engine/scene/game_settings.h"
+#include "game/menu.h"
 
 struct Game {
   Game();
   ~Game();
   void run();
-  void load();
   void save();
 
 private:
-  MaiApp *app;
+  GLFWwindow *window;
   MAI::Renderer *ren;
 
-  // resources
-  Textures *textures;
-  Assets *assets;
-  Objects *objects = nullptr;
-  StaticModels *staticModels = nullptr;
-  MAI::Buffer *buffPerFrame;
+  Menu *menu;
+  GameSettings gameSettings;
+  Inputs *inputs;
 
-  void initGame();
-  void guiWidget();
-  void clearAll();
-  void reset();
+  void load();
+  bool blackScreen();
 };

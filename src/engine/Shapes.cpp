@@ -6,6 +6,16 @@ struct ShapeVertex {
   glm::vec2 uv;
 };
 
+std::vector<ShapeVertex> planeVertices = {
+    // positions              // normals         // uvs
+    {{-0.5f, 0.0f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}}, // 0
+    {{0.5f, 0.0f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},  // 1
+    {{0.5f, 0.0f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},   // 2
+    {{-0.5f, 0.0f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},  // 3
+};
+
+std::vector<uint16_t> planeIndices{0, 1, 2, 2, 3, 0};
+
 std::vector<glm::vec3> cubeOnlyVertices = {
     // ===== Front (+Z) =====
     {-0.5f, -0.5f, 0.5f},
@@ -155,6 +165,27 @@ Shape Shapes::getCube(MAI::Renderer *ren, bool onlyPos) {
   shape.indicesSize = (uint32_t)cubeIndices.size();
 
   return shape;
+}
+
+Shape Shapes::getPlane(MAI::Renderer *ren) {
+  Shape sh;
+  sh.vertBuffer = ren->createBuffer({
+      .usage = MAI::StorageBuffer,
+      .storage = MAI::StorageType_Device,
+      .size = sizeof(ShapeVertex) * planeVertices.size(),
+      .data = planeVertices.data(),
+  });
+
+  sh.indexBuffer = ren->createBuffer({
+      .usage = MAI::IndexBuffer,
+      .storage = MAI::StorageType_Device,
+      .size = sizeof(uint16_t) * planeIndices.size(),
+      .data = planeIndices.data(),
+  });
+
+  sh.indicesSize = (uint32_t)planeIndices.size();
+
+  return sh;
 }
 
 Shape Shapes::getSphere(MAI::Renderer *ren) {

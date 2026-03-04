@@ -1,239 +1,38 @@
 #include "game/game.h"
-#include "engine/json.hpp"
-#include <fstream>
-#include <iostream>
-#include <thread>
-
-using json = nlohmann::json;
-
-struct BufferPerFrame {
-  glm::vec4 lightPos;
-  glm::vec4 lightColor;
-  glm::vec4 cameraPos;
-};
-
-struct GameSettings {
-  std::string name = "Game";
-  uint32_t width = 1200;
-  uint32_t height = 800;
-  bool isFullScreen = false;
-  uint32_t graphics_mode = 0;
-  uint32_t msaa = 1;
-} gameSettings;
 
 Game::Game() {
-  initGame();
+  gameSettings.init();
   load();
-  // prepare the resources
-  buffPerFrame = ren->createBuffer({
-      .usage = MAI::Storage_Buffer,
-      .storage = MAI::StorageType_Device,
-      .size = sizeof(BufferPerFrame),
-  });
 }
 
 void Game::run() {
+  while (!glfwWindowShouldClose(window)) {
+    glfwPollEvents();
 
-  glm::vec3 lightPos = glm::vec3(0.0f, 0.0f, 3.0f);
-  glm::vec3 lightColor = glm::vec3(255.0f, 255.0f, 255.0f);
-  app->beforeDraw = [&](MAI::CommandBuffer *buff, uint32_t width,
-                        uint32_t height, float ratio, float deltaSecond) {
-    BufferPerFrame buffPer{
-        .lightPos = glm::vec4(lightPos, 1.0f),
-        .lightColor = glm::vec4(lightColor, 1.0f),
-        .cameraPos = glm::vec4(app->camera->Position, 1.0f),
-    };
-    buff->update(buffPerFrame, &buffPer, sizeof(buffPer));
-  };
+    if (!menu->ready) {
+      if (!blackScreen())
+        continue;
+    } else {
+      menu->mainMenu();
+    }
+  }
+  ren->waitDeviceIdle();
+}
 
-  app->run([&](MAI::CommandBuffer *buff, uint32_t width, uint32_t height,
-               float ratio, float deltaSecond) {
-    glm::mat4 p = glm::perspective(45.0f, ratio, 0.1f, 1000.0f);
-    p[1][1] *= -1;
-    glm::mat4 view = app->camera->GetViewMatrix();
-    uint64_t buffAddress = ren->gpuAddress(buffPerFrame);
+bool Game::blackScreen() {
+  int width, height;
+  glfwGetFramebufferSize(window, &width, &height);
+  if (!width || !height)
+    return false;
 
-    buff->cmdBindDepthState({.depthWriteEnable = true, .compareOp = MAI::Less});
-
-    objects->draw(buff, buffAddress, p * view);
-    staticModels->draw(buff, p * view, buffAddress, app->camera->Position);
-
-    buff->cmdBindDepthState({});
-
-    guiWidget();
+  MAI::CommandBuffer *buff = ren->acquireCommandBuffer();
+  buff->cmdBeginRendering({
+      .clearColor = {0, 0, 0, 0},
   });
-}
-
-void Game::guiWidget() {
-  if (const ImGuiViewport *v = ImGui::GetMainViewport()) {
-    ImGui::SetNextWindowPos({v->WorkPos.x, v->WorkPos.y}, ImGuiCond_Always,
-                            {0.0f, 0.0f});
-    ImGui::SetNextWindowSize({v->WorkSize.x * 0.3f, v->WorkSize.y},
-                             ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.50f);
-  }
-  ImGui::Begin("Viewport");
-  if (ImGui::Button("Save"))
-    save();
-  // settings
-  if (ImGui::TreeNode("Settings")) {
-    ImGui::NewLine();
-    if (ImGui::Button("Resolution"))
-      ImGui::OpenPopup("res_settings");
-    ImGui::SameLine();
-    std::string res = std::to_string(gameSettings.width) + "x" +
-                      std::to_string(gameSettings.height);
-    ImGui::Text(res.c_str(), nullptr);
-
-    if (ImGui::BeginPopup("res_settings")) {
-      if (ImGui::Selectable("1920x1080")) {
-        gameSettings.width = 1920;
-        gameSettings.height = 1080;
-        glfwSetWindowSize(app->window, gameSettings.width, gameSettings.height);
-      }
-      if (ImGui::Selectable("1300x760")) {
-        gameSettings.width = 1300;
-        gameSettings.height = 760;
-        glfwSetWindowSize(app->window, gameSettings.width, gameSettings.height);
-      }
-      if (ImGui::Selectable("1200x760")) {
-        gameSettings.width = 1200;
-        gameSettings.height = 800;
-        glfwSetWindowSize(app->window, gameSettings.width, gameSettings.height);
-      }
-      ImGui::EndPopup();
-    }
-
-    ImGui::NewLine();
-    int fullScreen = (int)gameSettings.isFullScreen;
-    if (ImGui::RadioButton("Fullscreen", &fullScreen, 1)) {
-      GLFWmonitor *monitor = glfwGetPrimaryMonitor();
-      const GLFWvidmode *mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-      glfwSetWindowMonitor(app->window, monitor, 0, 0, gameSettings.width,
-                           gameSettings.height, mode->refreshRate);
-      gameSettings.isFullScreen = (bool)fullScreen;
-    }
-
-    ImGui::SameLine();
-    if (ImGui::RadioButton("Window", &fullScreen, 0)) {
-      gameSettings.isFullScreen = (bool)fullScreen;
-      glfwSetWindowMonitor(app->window, nullptr, 0, 0, gameSettings.width,
-                           gameSettings.height, 0);
-    }
-
-    ImGui::NewLine();
-    ImGui::Text("Graphics");
-
-    ImGui::NewLine();
-    if (ImGui::Button("Anti Aliasing"))
-      ImGui::OpenPopup("res_msaa");
-    ImGui::SameLine();
-
-    std::string name;
-    if (gameSettings.msaa == 0)
-      name = "off";
-    else if (gameSettings.msaa == 1)
-      name = "MSAA";
-    else if (gameSettings.msaa == 2)
-      name = "TAA";
-
-    ImGui::Text(name.c_str(), nullptr);
-
-    if (ImGui::BeginPopup("res_msaa")) {
-      if (ImGui::Selectable("off"))
-        gameSettings.msaa = 0;
-      if (ImGui::Selectable("MSAA"))
-        gameSettings.msaa = 1;
-      if (ImGui::Selectable("TAA"))
-        gameSettings.msaa = 2;
-      ImGui::EndPopup();
-    }
-
-    ImGui::TreePop();
-  }
-
-  glm::vec3 &camPos = app->camera->Position;
-
-  uint32_t id;
-  bool addAsset = false;
-  assets->assetsGui(id, addAsset);
-  if (addAsset) {
-    staticModels->addmodel(StaticModelInfo{
-        .model = assets->getModelInfo(id),
-        .pos = glm::vec3(camPos.x, camPos.y, camPos.z - 3.0),
-        .scale = 1.0f,
-    });
-  }
-
-  ImGui::NewLine();
-  ImGui::Text("Add Objects");
-  if (ImGui::Button("Cube")) {
-    objects->addObject({
-        .type = SHAPE,
-        .object_id = 0,
-        .tiling = 1.0f,
-        .color = glm::vec3(1.0f),
-        .pos = glm::vec3(camPos.x, camPos.y, camPos.z - 3.0),
-        .rotate = glm::vec3(0.0f),
-        .scale = glm::vec3(1.0f),
-    });
-  }
-
-  staticModels->allModelGui();
-  objects->allObjectGui();
-  ImGui::End();
-
-  if (const ImGuiViewport *v = ImGui::GetMainViewport()) {
-    ImGui::SetNextWindowPos(
-        {v->WorkPos.x + v->WorkSize.x - 15.0f, v->WorkPos.y + 100.0f},
-        ImGuiCond_Always, {1.0f, 0.0f});
-
-    ImGui::SetNextWindowSize({v->WorkSize.x * 0.3f, 0}, ImGuiCond_Always);
-  }
-
-  objects->objectGui();
-  staticModels->modelGui();
-}
-
-std::vector<ObjectsInfo> infos;
-void Game::initGame() {
-  // game state
-  std::ifstream f(RESOURCES_PATH "states/game_state.json");
-  json data = json::parse(f);
-  gameSettings.name = data["game_settings"]["name"].get<std::string>();
-  gameSettings.width = data["game_settings"]["width"].get<uint32_t>();
-  gameSettings.height = data["game_settings"]["height"].get<uint32_t>();
-  gameSettings.isFullScreen = data["game_settings"]["fullscreen"].get<bool>();
-  gameSettings.msaa = data["game_settings"]["msaa"].get<uint32_t>();
-  f.close();
-
-  // static objects
-  f = std::ifstream(RESOURCES_PATH "states/static_objects.json");
-  data = json::parse(f);
-
-  for (json::iterator it = data.begin(); it != data.end(); it++) {
-    ObjectsInfo info;
-    info.id = (*it)["id"].get<uint32_t>();
-    info.object_id = (*it)["object_id"].get<uint32_t>();
-    info.tex_id = (*it)["tex_id"].get<uint32_t>();
-    info.tiling = (*it)["tiling"].get<float>();
-    info.ao = (*it)["ao"].get<float>();
-    info.metallic = (*it)["metallic"].get<float>();
-    info.roughness = (*it)["roughness"].get<float>();
-
-    std::string type = (*it)["type"].get<std::string>();
-    if (type == "shape")
-      info.type = SHAPE;
-
-    std::vector<float> f3 = (*it)["pos"].get<std::vector<float>>();
-    std::cout << "parsing 4" << std::endl;
-    info.pos = glm::vec3(f3[0], f3[1], f3[2]);
-    f3 = (*it)["rotate"].get<std::vector<float>>();
-    info.rotate = glm::vec3(f3[0], f3[1], f3[2]);
-    f3 = (*it)["scale"].get<std::vector<float>>();
-    info.scale = glm::vec3(f3[0], f3[1], f3[2]);
-    infos.emplace_back(info);
-  }
+  buff->cmdEndRendering();
+  ren->submit();
+  delete buff;
+  return true;
 }
 
 void Game::load() {
@@ -245,82 +44,18 @@ void Game::load() {
       .allowResize = true,
   };
 
-  MAI::MSAASample sampleLevel =
-      gameSettings.msaa > 0 ? MAI::Count_4_Bit : MAI::Count_1_Bit;
-  app = new MaiApp(info, sampleLevel);
-  ren = app->ren;
-
-  std::thread j([&] { textures = new Textures(ren); });
-  std::thread j2([&] { assets = new Assets(ren); });
-  j.join();
-  j2.join();
-
-  VkFormat format = app->depthTexture->getDeptFormat();
-  objects = new Objects(ren, format, textures, sampleLevel);
-  objects->addObjects(infos);
-
-  staticModels = new StaticModels(ren, format, assets, sampleLevel);
+  window = MAI::initWindow(info);
+  ren = MAI::initVulkanWithSwapChain(window, info.appName);
+  inputs = new Inputs(window);
+  menu = new Menu(ren, gameSettings, inputs);
 }
 
-void Game::save() {
-  // settings
-  json settj;
-  std::string com = "game_settings";
-  settj[com]["name"] = gameSettings.name;
-  settj[com]["width"] = gameSettings.width;
-  settj[com]["height"] = gameSettings.height;
-  settj[com]["fullscreen"] = gameSettings.isFullScreen;
-  settj[com]["graphics_mod"] = gameSettings.graphics_mode;
-  settj[com]["msaa"] = gameSettings.msaa;
-
-  std::ofstream file(RESOURCES_PATH "states/game_state.json");
-  if (!file.is_open())
-    assert(false);
-
-  file << settj << std::endl;
-
-  // saving objects
-  infos.clear();
-  infos = objects->getObjectsInfos();
-  if (!infos.empty()) {
-    json js = json::array();
-    for (auto &data : infos) {
-      json j;
-      j["id"] = data.id;
-      j["type"] = data.type == SHAPE ? "shape" : "asset";
-      j["object_id"] = data.object_id;
-      j["tex_id"] = data.tex_id;
-      j["tiling"] = data.tiling;
-      j["ao"] = data.ao;
-      j["metallic"] = data.metallic;
-      j["roughness"] = data.roughness;
-
-      std::vector<float> value{data.color[0], data.color[1], data.color[2]};
-      j["color"] = value;
-      value = {data.pos[0], data.pos[1], data.pos[2]};
-      j["pos"] = value;
-      value = {data.rotate[0], data.rotate[1], data.rotate[2]};
-      j["rotate"] = value;
-      value = {data.scale[0], data.scale[1], data.scale[2]};
-      j["scale"] = value;
-      js.push_back(j);
-    }
-
-    file = std::ofstream(RESOURCES_PATH "states/static_objects.json");
-    if (!file.is_open())
-      assert(false);
-
-    file << js << std::endl;
-  }
-
-  std::cout << "saved" << std::endl;
-}
+void Game::save() { gameSettings.save(); }
 
 Game::~Game() {
-  delete staticModels;
-  delete assets;
-  delete buffPerFrame;
-  delete objects;
-  delete textures;
-  delete app;
+  delete menu;
+  delete inputs;
+  glfwDestroyWindow(window);
+  glfwTerminate();
+  delete ren;
 }

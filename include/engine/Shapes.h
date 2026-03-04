@@ -13,6 +13,7 @@ struct Shape {
 
 struct Shapes {
   static Shape getCube(MAI::Renderer *ren, bool onlyPos = false);
+  static Shape getPlane(MAI::Renderer *ren);
   static Shape getSphere(MAI::Renderer *ren);
   static Shape getCylinder(MAI::Renderer *ren, float radius, float height,
                            int segments);

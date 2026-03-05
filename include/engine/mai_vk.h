@@ -199,6 +199,18 @@ enum MSAASample : uint8_t {
   Count_32_Bit = 0x20,
 };
 
+enum AttachmentLoad : uint8_t {
+  LoadOp_Clear = 0x01,
+  LoadOp_Dont = 0x02,
+  LoadOp_Load = 0x04,
+};
+
+enum AttachmentStore : uint8_t {
+  StoreOp_Dont = 0x01,
+  StoreOp_Store = 0x02,
+  StoreOp_None = 0x04,
+};
+
 struct RendererDefault {
   bool defaultDescriptorPool = true;
   bool enablePipelineCache = false;
@@ -362,6 +374,10 @@ struct Renderer {
   void flushMappedMemeory(struct Buffer *buffer, VkDeviceSize offset,
                           VkDeviceSize size);
   struct VulkanContext *getVulkanContext() { return ctx; }
+  VkImage getSwapChainImage() { return ctx->swapChainImages[ctx->imageIndex]; }
+  VkImageView getSwapChainImageView() {
+    return ctx->swapChainImageViews[ctx->imageIndex];
+  }
 
   bool resetDepth = false;
 
@@ -414,10 +430,25 @@ private:
   VulkanContext *ctx;
 };
 
+struct ColorAttachment {
+  VkImage image = VK_NULL_HANDLE;
+  VkImageView imageView = VK_NULL_HANDLE;
+  VkImage resolveImage = VK_NULL_HANDLE;
+  VkImageView resolveView = VK_NULL_HANDLE;
+  AttachmentLoad load = MAI::LoadOp_Clear;
+  AttachmentStore store = MAI::StoreOp_None;
+};
+
+struct DepthAttachment {
+  struct Texture *texture = nullptr;
+  AttachmentLoad load = MAI::LoadOp_Clear;
+  AttachmentStore store = MAI::StoreOp_Dont;
+};
+
 struct BeginInfo {
   float clearColor[4] = {0.05f, 0.05f, 0.05f, 1.0f};
-  struct Texture *texture = nullptr;
-  struct Texture *colorTexture = nullptr;
+  DepthAttachment depth;
+  std::vector<ColorAttachment> color;
 };
 
 struct DepthState {
@@ -543,6 +574,7 @@ struct TextureInfo {
   TextureUsage usage;
   MSAASample sampleCount = MAI::Count_1_Bit;
   bool updateDescriptor = true;
+  bool srcOptimal = false;
 };
 
 struct PoolSize {
@@ -891,6 +923,8 @@ VkDescriptorBindingFlags getDescriptorBindingFlags(MAIFlags binding);
 VkDescriptorSetLayoutCreateFlags
 getDescriptorSetLayoutCreateFlags(MAIFlags layoutFlags);
 VkSampleCountFlagBits getSampleCount(MSAASample flag);
+VkAttachmentLoadOp getAttachmentLoad(AttachmentLoad load);
+VkAttachmentStoreOp getAttachmentStore(AttachmentStore store);
 
 #ifdef MAI_INCLUDE_GLSLANG
 void compileShaderGlslang(ShaderStage stage, const char *code,
@@ -1350,6 +1384,10 @@ struct Texture *Renderer::createImage(const struct TextureInfo &info) {
     imageInfo.usage =
         getImageUsage(info.usage) | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
 
+  if (info.srcOptimal)
+    imageInfo.usage =
+        getImageUsage(info.usage) | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+
   if (info.type == MAI::TextureType_Cube) {
     imageSize *= sizeof(float) * 6;
     layerCount = 6;
@@ -1648,38 +1686,24 @@ void Descriptor::updateDescriptorWrite(const struct DescriptorWriteInfo &info) {
 CommandBuffer::CommandBuffer(VulkanContext *ctx) : ctx(ctx) {}
 
 void CommandBuffer::cmdBeginRendering(const struct BeginInfo &info) {
-
   uint32_t frameIndex = ctx->frameIndex;
-  VkImage swapChainImage = ctx->swapChainImages[ctx->imageIndex];
 
-  ctx->transition_image_layout(
-      VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
-      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0,
-      VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-      VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-      VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, swapChainImage);
+  for (auto c : info.color) {
+    if (c.image != VK_NULL_HANDLE)
+      ctx->transition_image_layout(
+          VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0,
+          VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+          VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+          VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, c.image);
 
-  if (info.texture != nullptr) {
-    ctx->transition_image_layout(
-        VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
-            VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-        VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
-            VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-        info.texture->getImage());
-  }
-
-  if (info.colorTexture != nullptr) {
-    ctx->transition_image_layout(
-        VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0,
-        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-        info.colorTexture->getImage());
+    if (c.resolveImage != VK_NULL_HANDLE)
+      ctx->transition_image_layout(
+          VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0,
+          VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+          VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+          VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, c.resolveImage);
   }
 
   VkClearValue clearColor = {
@@ -1700,34 +1724,51 @@ void CommandBuffer::cmdBeginRendering(const struct BeginInfo &info) {
       .offset = {0, 0},
       .extent = ctx->swapChainExtent,
   };
+
   VkRenderingAttachmentInfo depthAttachmentInfo;
 
-  if (info.texture != nullptr)
+  if (info.depth.texture != nullptr) {
+    ctx->transition_image_layout(
+        VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
+            VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+        VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
+            VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+        info.depth.texture->getImage());
+
     depthAttachmentInfo = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-        .imageView = info.texture->getImageView(),
+        .imageView = info.depth.texture->getImageView(),
         .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
         .clearValue = clearDepth,
     };
+  }
 
-  VkRenderingAttachmentInfo attachmentInfo = {
-      .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-      .imageView = ctx->swapChainImageViews[ctx->imageIndex],
-      .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-      .storeOp = VK_ATTACHMENT_STORE_OP_NONE,
-      .clearValue = clearColor,
-  };
+  std::vector<VkRenderingAttachmentInfo> colorAttachments;
 
-  if (info.colorTexture != nullptr) {
-    attachmentInfo.imageView = info.colorTexture->getImageView();
-    attachmentInfo.resolveImageView = ctx->swapChainImageViews[ctx->imageIndex];
-    attachmentInfo.resolveImageLayout =
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    attachmentInfo.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
-    attachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+  for (auto &c : info.color) {
+    VkRenderingAttachmentInfo attachmentInfo = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .imageView = c.imageView,
+        .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .loadOp = getAttachmentLoad(c.load),
+        .storeOp = getAttachmentStore(c.store),
+        .clearValue = clearColor,
+    };
+
+    if (c.resolveView != VK_NULL_HANDLE) {
+      attachmentInfo.resolveImageView = c.resolveView;
+      attachmentInfo.resolveImageLayout =
+          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+      attachmentInfo.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+    }
+
+    colorAttachments.emplace_back(attachmentInfo);
   }
 
   VkRenderingInfo renderingInfo{
@@ -1738,10 +1779,10 @@ void CommandBuffer::cmdBeginRendering(const struct BeginInfo &info) {
               .extent = ctx->swapChainExtent,
           },
       .layerCount = 1,
-      .colorAttachmentCount = 1,
-      .pColorAttachments = &attachmentInfo,
+      .colorAttachmentCount = (uint32_t)colorAttachments.size(),
+      .pColorAttachments = colorAttachments.data(),
   };
-  if (info.texture != nullptr)
+  if (info.depth.texture != nullptr)
     renderingInfo.pDepthAttachment = &depthAttachmentInfo;
 
   VkCommandBuffer &commandBuffer = ctx->commandBuffers[frameIndex];
@@ -3892,6 +3933,30 @@ VkSampleCountFlagBits getSampleCount(MSAASample flag) {
     return VK_SAMPLE_COUNT_16_BIT;
   case Count_32_Bit:
     return VK_SAMPLE_COUNT_32_BIT;
+  }
+  assert(false);
+}
+
+VkAttachmentLoadOp getAttachmentLoad(AttachmentLoad load) {
+  switch (load) {
+  case LoadOp_Clear:
+    return VK_ATTACHMENT_LOAD_OP_CLEAR;
+  case LoadOp_Dont:
+    return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+  case LoadOp_Load:
+    return VK_ATTACHMENT_LOAD_OP_LOAD;
+  }
+  assert(false);
+}
+
+VkAttachmentStoreOp getAttachmentStore(AttachmentStore store) {
+  switch (store) {
+  case StoreOp_Dont:
+    return VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  case StoreOp_Store:
+    return VK_ATTACHMENT_STORE_OP_STORE;
+  case StoreOp_None:
+    return VK_ATTACHMENT_STORE_OP_NONE;
   }
   assert(false);
 }

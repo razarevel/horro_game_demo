@@ -18,6 +18,7 @@ layout(location = 0) out vec2 uvs;
 layout(push_constant) uniform PerFrameData {
 		mat4 mvp;
 		uint textureId;
+		uint id;
 		Vertices vtx;
 }pc;
 

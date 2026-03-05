@@ -1,4 +1,5 @@
 #pragma once
+#include "engine/Camera.h"
 #include "engine/Shapes.h"
 #include "engine/imageLoader.h"
 #include "engine/inputs.h"
@@ -18,12 +19,22 @@ private:
   MAI::Renderer *ren;
   GameSettings gameSettings;
 
+  // depth textures
+  MAI::Texture *depthTextureMSAA = nullptr;
   MAI::Texture *depthTexture = nullptr;
   MAI::Texture *msaTexture = nullptr;
+  MAI::Texture *colorTexture = nullptr;
 
   MAI::Pipeline *pipeline;
+  MAI::Pipeline *pipelinePicking;
   MAI::Texture *logo;
   Shape plane;
 
+  Camera *camera;
+
   void prepareDepthTexs();
+  void updateUtils();
+
+  void perparePipelines();
+  void colorPicking();
 };

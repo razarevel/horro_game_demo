@@ -28,6 +28,10 @@ bool Game::blackScreen() {
   MAI::CommandBuffer *buff = ren->acquireCommandBuffer();
   buff->cmdBeginRendering({
       .clearColor = {0, 0, 0, 0},
+      .color = {{
+          .image = ren->getSwapChainImage(),
+          .imageView = ren->getSwapChainImageView(),
+      }},
   });
   buff->cmdEndRendering();
   ren->submit();

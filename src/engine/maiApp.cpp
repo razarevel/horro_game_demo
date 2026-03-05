@@ -8,10 +8,10 @@ void setKeyboardConfig(GLFWwindow *window, int key, int scancode, int action,
                        int mods);
 void processInput(GLFWwindow *window);
 
-float deltaSecond = 0.0f;
-bool firstMouse = true;
-float lastX = 0.0f;
-float lastY = 0.0f;
+// float deltaSeconds = 0.0f;
+// bool firstMouse = true;
+// float lastX = 0.0f;
+// float lastY = 0.0f;
 
 MaiApp::MaiApp(MAI::WindowInfo &info, MAI::MSAASample count)
     : sampleCount(count) {
@@ -68,14 +68,14 @@ void setKeyboardConfig(GLFWwindow *window, int key, int scancode, int action,
 void processInput(GLFWwindow *window) {
   MaiApp *mai = reinterpret_cast<MaiApp *>(glfwGetWindowUserPointer(window));
 
-  if (glfwGetKey(window, GLFW_KEY_W) && GLFW_PRESS)
-    mai->camera->ProcessKeyboard(FORWARD, deltaSecond);
-  if (glfwGetKey(window, GLFW_KEY_S) && GLFW_PRESS)
-    mai->camera->ProcessKeyboard(BACKWARD, deltaSecond);
-  if (glfwGetKey(window, GLFW_KEY_A) && GLFW_PRESS)
-    mai->camera->ProcessKeyboard(LEFT, deltaSecond);
-  if (glfwGetKey(window, GLFW_KEY_D) && GLFW_PRESS)
-    mai->camera->ProcessKeyboard(RIGHT, deltaSecond);
+  // if (glfwGetKey(window, GLFW_KEY_W) && GLFW_PRESS)
+  //   mai->camera->ProcessKeyboard(FORWARD, deltaSecond);
+  // if (glfwGetKey(window, GLFW_KEY_S) && GLFW_PRESS)
+  //   mai->camera->ProcessKeyboard(BACKWARD, deltaSecond);
+  // if (glfwGetKey(window, GLFW_KEY_A) && GLFW_PRESS)
+  //   mai->camera->ProcessKeyboard(LEFT, deltaSecond);
+  // if (glfwGetKey(window, GLFW_KEY_D) && GLFW_PRESS)
+  //   mai->camera->ProcessKeyboard(RIGHT, deltaSecond);
 }
 
 std::array<bool, 2> MaiApp::getMods() {
@@ -89,25 +89,25 @@ void MaiApp::updateMouseMovement() {
   if (ImGui::GetIO().WantCaptureMouse)
     return;
 
-  if (mouseState.pressedLeft) {
-    float xpos = static_cast<float>(mouseState.pos.x);
-    float ypos = static_cast<float>(mouseState.pos.y);
-
-    if (firstMouse) {
-      lastX = xpos;
-      lastY = ypos;
-      firstMouse = false;
-    }
-
-    float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos;
-
-    lastX = xpos;
-    lastY = ypos;
-
-    camera->ProcessMouseMovement(xoffset, yoffset);
-  } else
-    firstMouse = true;
+  // if (mouseState.pressedLeft) {
+  //   float xpos = static_cast<float>(mouseState.pos.x);
+  //   float ypos = static_cast<float>(mouseState.pos.y);
+  //
+  //   if (firstMouse) {
+  //     lastX = xpos;
+  //     lastY = ypos;
+  //     firstMouse = false;
+  //   }
+  //
+  //   float xoffset = xpos - lastX;
+  //   float yoffset = lastY - ypos;
+  //
+  //   lastX = xpos;
+  //   lastY = ypos;
+  //
+  //   // camera->ProcessMouseMovement(xoffset, yoffset);
+  // } else
+  //   firstMouse = true;
 }
 
 void MaiApp::prepareTextures() {
@@ -165,26 +165,26 @@ void MaiApp::run(DrawFrameFunc drawFrame) {
 
     float ratio = width / (float)height;
     const double newTimeStamp = glfwGetTime();
-    deltaSecond = static_cast<float>(newTimeStamp - timeStamp);
+    // deltaSeconds = static_cast<float>(newTimeStamp - timeStamp);
     timeStamp = newTimeStamp;
 
     processInput(window);
     mouse_state = mouseState;
     updateMouseMovement();
 
-    fps.tick(deltaSecond);
+    // fps.tick(deltaSeconds);
     currentFPS = fps.currentFPS_;
 
     MAI::CommandBuffer *buff = ren->acquireCommandBuffer();
 
-    beforeDraw(buff, width, height, ratio, deltaSecond);
+    // beforeDraw(buff, width, height, ratio, deltaSeconds);
     // draw
     buff->cmdBeginRendering({
-        .texture = depthTexture,
-        .colorTexture = colorTexture,
+        // .texture = depthTexture,
+        // .colorTexture = colorTexture,
     });
     imgui->beginFrame({(uint32_t)width, (uint32_t)height});
-    drawFrame(buff, width, height, ratio, deltaSecond);
+    // drawFrame(buff, width, height, ratio, deltaSeconds);
     // fps
     {
       if (const ImGuiViewport *v = ImGui::GetMainViewport()) {

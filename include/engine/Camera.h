@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/inputs.h"
 #include "imgui.h"
 #include <glm/ext.hpp>
 #include <glm/glm.hpp>
@@ -46,32 +47,62 @@ struct Camera {
     return glm::lookAt(Position, Position + Front, Up);
   }
 
-  void ProcessKeyboard(CameraMovement direction, float deltaTime) {
+  void ProcessKeyboard(float deltaTime, Inputs &inputs) {
     float velocity = MovementSpeed * deltaTime;
-    if (direction == FORWARD)
+    if (inputs.keys[GLFW_KEY_W])
       Position += Front * velocity;
-    if (direction == BACKWARD)
+    if (inputs.keys[GLFW_KEY_S])
       Position -= Front * velocity;
-    if (direction == LEFT)
+    if (inputs.keys[GLFW_KEY_A])
       Position -= Right * velocity;
-    if (direction == RIGHT)
+    if (inputs.keys[GLFW_KEY_D])
       Position += Right * velocity;
   }
 
-  void ProcessMouseMovement(float xoffset, float yoffset,
-                            bool constraintPitch = true) {
-    xoffset *= MouseSensitivit;
-    yoffset *= MouseSensitivit;
+  bool firstMouse = true;
+  float lastX = 0.0f;
+  float lastY = 0.0f;
+  void ProcessMouseMovement(Inputs &inputs, bool constraintPitch = true) {
+    // if (ImGui::GetIO().WantCaptureMouse)
+    //   return;
 
-    Yaw += xoffset;
-    Pitch -= yoffset;
+    if (inputs.mouseKeys[0]) {
+      int width, height;
+      inputs.getWindowSize(width, height);
+      double mouseX, mouseY;
+      inputs.getMousePos(mouseX, mouseY);
+      mouseX = mouseX / width;
+      mouseY = 1.0 - mouseY / height;
 
-    if (constraintPitch) {
-      if (Pitch > 80.0f)
-        Pitch = 80.0f;
-      if (Pitch < -80.0f)
-        Pitch = -80.0f;
-    }
+      float xpos = static_cast<float>(mouseX);
+      float ypos = static_cast<float>(mouseY);
+
+      if (firstMouse) {
+        lastX = xpos;
+        lastY = ypos;
+        firstMouse = false;
+      }
+
+      float xoffset = xpos - lastX;
+      float yoffset = lastY - ypos;
+
+      lastX = xpos;
+      lastY = ypos;
+
+      xoffset *= MouseSensitivit;
+      yoffset *= MouseSensitivit;
+
+      Yaw += xoffset;
+      Pitch -= yoffset;
+
+      if (constraintPitch) {
+        if (Pitch > 80.0f)
+          Pitch = 80.0f;
+        if (Pitch < -80.0f)
+          Pitch = -80.0f;
+      }
+    } else
+      firstMouse = true;
 
     updateCameraView();
   }

@@ -12,6 +12,8 @@ Menu::Menu(MAI::Renderer *ren, GameSettings &gameSett, Inputs *in)
   prepareDepthTexs();
   perparePipelines();
 
+  debugger = new Debugger(ren, depthTexture->getDeptFormat());
+
   plane = Shapes::getPlane(ren);
   logo = ImageLoader::loadFromFile(ren, RESOURCES_PATH "logo.png");
   ready = true;
@@ -141,7 +143,7 @@ void Menu::mainMenu() {
   updateUtils();
 
   float ratio = width / (float)height;
-  glm::mat4 p = glm::perspective(glm::radians(45.0f), ratio, 1.0f, 1000.0f);
+  glm::mat4 p = glm::perspective(glm::radians(45.0f), ratio, .01f, 1000.0f);
   p[1][1] *= -1;
 
   glm::mat4 model = glm::mat4(1.0f);
@@ -161,6 +163,8 @@ void Menu::mainMenu() {
   };
 
   MAI::CommandBuffer *buff = ren->acquireCommandBuffer();
+
+  // offscreen
   buff->cmdBeginRendering({
       .depth = {.texture = depthTexture},
       .color =
@@ -175,9 +179,10 @@ void Menu::mainMenu() {
     buff->bindIndexBuffer(plane.indexBuffer, 0, MAI::Uint16);
     buff->cmdDrawIndex(plane.indicesSize);
   }
-  buff->cmdEndRendering(colorTexture);
+  buff->cmdEndRendering(colorTexture, false);
   colorPicking();
 
+  // rendering
   buff->cmdBeginRendering({
       .depth = {.texture = depthTextureMSAA},
       .color = {{
@@ -193,12 +198,29 @@ void Menu::mainMenu() {
     buff->bindIndexBuffer(plane.indexBuffer, 0, MAI::Uint16);
     buff->cmdDrawIndex(plane.indicesSize);
   }
+  buff->cmdEndRendering(nullptr, false);
+
+  // ui
+  buff->cmdBeginRendering({
+      .depth =
+          {
+              .texture = depthTexture,
+          },
+      .color = {{
+          .image = ren->getSwapChainImage(),
+          .imageView = ren->getSwapChainImageView(),
+          .load = MAI::LoadOp_Load,
+          .store = MAI::StoreOp_Store,
+      }},
+  });
+  debugger->drawGrid(buff, p * view, camera->Position);
   buff->cmdEndRendering();
   ren->submit();
   delete buff;
 }
 
 Menu::~Menu() {
+  delete debugger;
   delete logo;
   delete pipeline;
   delete pipelinePicking;

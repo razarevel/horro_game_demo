@@ -6,6 +6,7 @@
 #include "engine/mai_config.h"
 #include "engine/mai_vk.h"
 #include "engine/scene/game_settings.h"
+#include "game/debugger.h"
 
 struct Menu {
   Menu(MAI::Renderer *ren, GameSettings &gameSett, Inputs *in);
@@ -29,6 +30,8 @@ private:
   MAI::Pipeline *pipelinePicking;
   MAI::Texture *logo;
   Shape plane;
+
+  Debugger *debugger;
 
   Camera *camera;
 

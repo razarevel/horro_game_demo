@@ -400,7 +400,8 @@ struct CommandBuffer {
   CommandBuffer(VulkanContext *ctx);
 
   void cmdBeginRendering(const struct BeginInfo &info);
-  void cmdEndRendering(struct Texture *colorTexture = nullptr);
+  void cmdEndRendering(struct Texture *colorTexture = nullptr,
+                       bool endBuff = true);
   void bindPipeline(Pipeline *pipeline, Descriptor *descriptor = nullptr);
   void bindComputePipeline(Pipeline *pipeline);
   void bindVertexBuffer(uint32_t firstBinding, Buffer *buffer,
@@ -1796,7 +1797,8 @@ void CommandBuffer::cmdBeginRendering(const struct BeginInfo &info) {
   });
 }
 
-void CommandBuffer::cmdEndRendering(struct Texture *colorTexture) {
+void CommandBuffer::cmdEndRendering(struct Texture *colorTexture,
+                                    bool endBuff) {
 
   vkCmdEndRendering(ctx->commandBuffers[ctx->frameIndex]);
 
@@ -1815,7 +1817,7 @@ void CommandBuffer::cmdEndRendering(struct Texture *colorTexture) {
         VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
         ctx->swapChainImages[ctx->imageIndex]);
 
-  if (!colorTexture) {
+  if (endBuff) {
     vkEndCommandBuffer(ctx->commandBuffers[ctx->frameIndex]);
     lastBindPipline = nullptr;
   }

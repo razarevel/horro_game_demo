@@ -23,7 +23,7 @@ layout(push_constant) uniform PerFrameData {
 }pc;
 
 vec3 getPosition(int i) {
-	return vec3(pc.vtx.in_Vertices[i].x, pc.vtx.in_Vertices[i].y, 0.0f);
+	return vec3(pc.vtx.in_Vertices[i].x, pc.vtx.in_Vertices[i].y, 1.0f);
 }
 
 void main() {

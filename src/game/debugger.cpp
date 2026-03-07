@@ -1,8 +1,8 @@
 #include "game/debugger.h"
 
 Debugger::Debugger(MAI::Renderer *ren, VkFormat format) {
-  MAI::Shader *vert = ren->createShader(SHADERS_PATH "grid.vert");
-  MAI::Shader *frag = ren->createShader(SHADERS_PATH "grid.frag");
+  MAI::Shader *vert = ren->createShader(SHADERS_PATH "spvs/grid.vspv");
+  MAI::Shader *frag = ren->createShader(SHADERS_PATH "spvs/grid.fspv");
 
   pipeline = ren->createPipeline({
       .vert = vert,

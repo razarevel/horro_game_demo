@@ -51,7 +51,7 @@ void Game::load() {
   window = MAI::initWindow(info);
   ren = MAI::initVulkanWithSwapChain(window, info.appName);
   inputs = new Inputs(window);
-  menu = new Menu(ren, gameSettings, inputs);
+  menu = new Menu(ren, window, gameSettings, inputs);
 }
 
 void Game::save() { gameSettings.save(); }
